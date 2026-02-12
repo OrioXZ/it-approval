@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -140,38 +141,69 @@ func (h *Handlers) PatchRequestStatus(c *gin.Context) {
 		return
 	}
 
-	var row appdb.Request
-	if err := h.DB.First(&row, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-		return
-	}
-
 	var body PatchStatusBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
 		return
 	}
 
+	// ⭐ transaction start
+	tx := h.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	var row appdb.Request
+	err = tx.First(&row, "id = ?", id).Error
+
+	// ⭐ แยก not found vs db error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		tx.Rollback()
+		c.JSON(http.StatusNotFound, gin.H{"error": "request not found"})
+		return
+	}
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	// ⭐ business rule: ถ้า status เดิมเป็น final → ห้ามแก้
+	currentFinal, _ := isFinalStatus(tx, row.StatusCode)
+	if currentFinal {
+		tx.Rollback()
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "cannot update request with final status",
+		})
+		return
+	}
+
 	updates := map[string]any{}
 
-	// ถ้ามีการเปลี่ยน status_code -> validate ว่ามีอยู่ใน master_status จริง
+	// ⭐ validate status_code
 	if body.StatusCode != nil {
 		code := *body.StatusCode
 
-		final, err := isFinalStatus(h.DB, code)
+		final, err := isFinalStatus(tx, code)
 		if err != nil {
+			tx.Rollback()
 			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown status_code"})
 			return
 		}
 
-		// ถ้าเป็น final status แนะนำให้ส่ง decided_reason + decided_by มาด้วย (เชิงธุรกิจ)
+		// ถ้าเป็น final → ต้องมี reason + by
 		if final {
 			if body.DecidedReason == nil || body.DecidedBy == nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "final status requires decided_reason and decided_by"})
+				tx.Rollback()
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": "final status requires decided_reason and decided_by",
+				})
 				return
 			}
-			now := time.Now().UTC().Format(time.RFC3339)
-			updates["decided_at"] = now
+
+			updates["decided_at"] = time.Now().UTC().Format(time.RFC3339)
 		}
 
 		updates["status_code"] = code
@@ -185,18 +217,25 @@ func (h *Handlers) PatchRequestStatus(c *gin.Context) {
 	}
 
 	if len(updates) == 0 {
-		// ไม่ส่ง field มาเลย -> ตอบข้อมูลเดิม
+		tx.Rollback()
 		c.JSON(http.StatusOK, row)
 		return
 	}
 
-	if err := h.DB.Model(&appdb.Request{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+	if err := tx.Model(&row).Updates(updates).Error; err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "commit failed"})
+		return
+	}
+
 	var out appdb.Request
-	_ = h.DB.First(&out, "id = ?", id).Error
+	h.DB.First(&out, "id = ?", id)
+
 	c.JSON(http.StatusOK, out)
 }
 
