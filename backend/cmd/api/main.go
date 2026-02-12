@@ -8,14 +8,12 @@ import (
 	appdb "it-approval-backend/internal/db"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 func main() {
 	_ = os.MkdirAll("db", 0755)
 
-	gdb, err := gorm.Open(sqlite.Open("db/app.db"), &gorm.Config{})
+	gdb, err := appdb.NewDB()
 	if err != nil {
 		log.Fatal(err)
 	}
