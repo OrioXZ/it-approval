@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appdb "it-approval-backend/internal/db"
+	dbmodels "it-approval-backend/internal/db"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -133,16 +134,9 @@ type PatchStatusBody struct {
 
 // PATCH /requests/:id/status
 func (h *Handlers) PatchRequestStatus(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-
-	var body PatchStatusBody
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
 		return
 	}
 
@@ -152,19 +146,35 @@ func (h *Handlers) PatchRequestStatus(c *gin.Context) {
 		return
 	}
 
+	var body PatchStatusBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
+		return
+	}
+
 	updates := map[string]any{}
 
+	// ถ้ามีการเปลี่ยน status_code -> validate ว่ามีอยู่ใน master_status จริง
 	if body.StatusCode != nil {
-		// validate status exists
-		var st appdb.Status
-		if err := h.DB.First(&st, "code = ?", *body.StatusCode).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status_code"})
+		code := *body.StatusCode
+
+		final, err := isFinalStatus(h.DB, code)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown status_code"})
 			return
 		}
-		updates["status_code"] = *body.StatusCode
-		// ถือว่า “ตัดสินแล้ว” เมื่อมีการเปลี่ยนสถานะผ่าน endpoint นี้
-		now := time.Now().UTC().Format(time.RFC3339)
-		updates["decided_at"] = now
+
+		// ถ้าเป็น final status แนะนำให้ส่ง decided_reason + decided_by มาด้วย (เชิงธุรกิจ)
+		if final {
+			if body.DecidedReason == nil || body.DecidedBy == nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "final status requires decided_reason and decided_by"})
+				return
+			}
+			now := time.Now().UTC().Format(time.RFC3339)
+			updates["decided_at"] = now
+		}
+
+		updates["status_code"] = code
 	}
 
 	if body.DecidedReason != nil {
@@ -175,7 +185,7 @@ func (h *Handlers) PatchRequestStatus(c *gin.Context) {
 	}
 
 	if len(updates) == 0 {
-		// ไม่ส่ง field มาเลย -> ไม่ทำอะไร แต่ตอบข้อมูลเดิม
+		// ไม่ส่ง field มาเลย -> ตอบข้อมูลเดิม
 		c.JSON(http.StatusOK, row)
 		return
 	}
@@ -188,4 +198,12 @@ func (h *Handlers) PatchRequestStatus(c *gin.Context) {
 	var out appdb.Request
 	_ = h.DB.First(&out, "id = ?", id).Error
 	c.JSON(http.StatusOK, out)
+}
+
+func isFinalStatus(db *gorm.DB, code string) (bool, error) {
+	var st dbmodels.Status
+	if err := db.Where("code = ?", code).First(&st).Error; err != nil {
+		return false, err
+	}
+	return st.IsFinal == "Y", nil
 }
