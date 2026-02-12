@@ -10,3 +10,14 @@ type Request struct {
 	CreatedAt     string  `json:"created_at"`
 	UpdatedAt     string  `json:"updated_at"`
 }
+
+type Status struct {
+	Code    string  `json:"code" gorm:"primaryKey"`
+	Label   string  `json:"label"`
+	Seq     int     `json:"seq"`
+	Color   *string `json:"color"`
+	IsFinal string  `json:"is_final"`
+}
+
+func (Request) TableName() string { return "requests" }
+func (Status) TableName() string  { return "master_status" }
