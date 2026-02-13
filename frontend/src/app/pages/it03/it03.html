@@ -1,0 +1,76 @@
+<div class="page">
+  <div class="topbar">
+    <div class="tabs">
+      <button class="tab" [class.active]="activeTab()==='PENDING'" (click)="setTab('PENDING')">รออนุมัติ</button>
+      <button class="tab" [class.active]="activeTab()==='APPROVED'" (click)="setTab('APPROVED')">อนุมัติ</button>
+      <button class="tab" [class.active]="activeTab()==='REJECTED'" (click)="setTab('REJECTED')">ไม่อนุมัติ</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn approve" (click)="openApprove()" [disabled]="!canAct()">อนุมัติ</button>
+      <button class="btn reject"  (click)="openReject()"  [disabled]="!canAct()">ไม่อนุมัติ</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:56px;">เลือก</th>
+          <th>เอกสาร</th>
+          <th>ผู้ขอ</th>
+          <th style="width:140px;">สถานะเอกสาร</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr *ngFor="let d of filteredDocs()" [class.selected]="selectedId()===d.id">
+          <td class="center">
+            <input type="checkbox" [checked]="selectedId()===d.id" (change)="select(d.id)" />
+          </td>
+          <td>{{ d.title }}</td>
+          <td>{{ d.owner }}</td>
+          <td>
+            <span class="badge" [attr.data-status]="d.status">{{ statusText(d.status) }}</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="hint" *ngIf="selectedDoc()?.status === 'APPROVED'">
+      รายการนี้อนุมัติแล้ว → ไม่สามารถกดอนุมัติซ้ำได้
+    </div>
+  </div>
+</div>
+
+<!-- Modal (IT 03-2 / IT 03-3) -->
+<div class="backdrop" *ngIf="modalOpen()" (click)="closeModal()"></div>
+
+<div class="modal" *ngIf="modalOpen()">
+  <div class="modal-header">
+    <div class="title">
+      {{ modalMode()==='APPROVE' ? 'ยืนยันการอนุมัติ' : 'ยืนยันการไม่อนุมัติ' }}
+    </div>
+    <button class="x" (click)="closeModal()">×</button>
+  </div>
+
+  <div class="modal-body">
+    <div class="row">
+      <div class="label">เหตุผล:</div>
+      <textarea [(ngModel)]="reason" rows="5" placeholder="กรอกเหตุผล..."></textarea>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button class="btn secondary" (click)="closeModal()">ยกเลิก</button>
+    <button
+      class="btn"
+      [class.approve]="modalMode()==='APPROVE'"
+      [class.reject]="modalMode()==='REJECT'"
+      (click)="submit()"
+      [disabled]="!reason().trim()"
+    >
+      {{ modalMode()==='APPROVE' ? 'อนุมัติ' : 'ไม่อนุมัติ' }}
+    </button>
+  </div>
+</div>
