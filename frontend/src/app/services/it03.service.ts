@@ -31,15 +31,17 @@ export class It03Service {
   
   approve(id: number, reason: string) {
     return this.http.patch(`${this.baseUrl}/requests/${id}/status`, {
-      statusCode: 'APPROVED',
-      decidedReason: reason
+      status_code: 'APPROVED',
+      decided_reason: reason,
+      decided_by: 'คนน่ารักโปรดให้ผ่าน'
     });
   }
 
   reject(id: number, reason: string) {
     return this.http.patch(`${this.baseUrl}/requests/${id}/status`, {
-      statusCode: 'REJECTED',
-      decidedReason: reason
+      status_code: 'REJECTED',
+      decided_reason: reason,
+      decided_by: 'คนใจร้ายไม่ให้ไป'
     });
   }
 

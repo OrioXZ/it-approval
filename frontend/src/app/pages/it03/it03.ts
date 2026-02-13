@@ -57,7 +57,6 @@ export class It03Component {
     this.it03.getDocs(status).subscribe({
       next: (res: any) => {
         const list = res ?? [];
-        console.log(list);
         
         this.docs.set(list);
       },
