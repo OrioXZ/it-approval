@@ -32,3 +32,4 @@ Tech Stack:
 cd backend
 go mod tidy
 go run ./cmd/api
+```
