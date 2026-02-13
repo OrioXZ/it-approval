@@ -80,7 +80,8 @@ npm install -g @angular/cli
 
 ``` bash
 cd backend
-go run main.go
+go run ./cmd/api
+
 ```
 
 Backend runs at:
@@ -118,8 +119,9 @@ PATCH /requests/{id}/status
 
 ``` json
 {
-  "statusCode": "APPROVED",
-  "decidedBy": "admin"
+  "status_code": "APPROVED",
+  "decided_reason": "admin",
+  "decided_by": "admin"
 }
 ```
 
@@ -127,9 +129,9 @@ PATCH /requests/{id}/status
 
 ``` json
 {
-  "statusCode": "REJECTED",
-  "decidedReason": "not enough budget",
-  "decidedBy": "admin"
+  "status_code": "REJECTED",
+  "decided_reason": "not enough budget",
+  "decided_by": "admin"
 }
 ```
 
