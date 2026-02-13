@@ -60,14 +60,25 @@ func (h *Handlers) GetRequests(c *gin.Context) {
 		}
 	}
 
+	status := c.Query("status") // ✅ เพิ่ม
+
+	// ✅ base query
+	q := h.DB.Model(&appdb.Request{})
+
+	// ✅ filter by status (ถ้ามี)
+	if status != "" {
+		q = q.Where("status_code = ?", status)
+	}
+
+	// ✅ total ต้องนับตาม filter เดียวกัน
 	var total int64
-	if err := h.DB.Model(&appdb.Request{}).Count(&total).Error; err != nil {
+	if err := q.Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	var rows []appdb.Request
-	if err := h.DB.
+	if err := q.
 		Order("created_at DESC").
 		Limit(limit).
 		Offset(offset).
