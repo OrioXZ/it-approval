@@ -7,8 +7,8 @@
     </div>
 
     <div class="actions">
-      <button class="btn approve" (click)="openApprove()" [disabled]="!canAct()">อนุมัติ</button>
-      <button class="btn reject"  (click)="openReject()"  [disabled]="!canAct()">ไม่อนุมัติ</button>
+      <button class="btn approve" (click)="openApprove()" [disabled]="!canApproveReject()">อนุมัติ</button>
+      <button class="btn reject"  (click)="openReject()"  [disabled]="!canApproveReject()">ไม่อนุมัติ</button>
     </div>
   </div>
 
@@ -26,7 +26,7 @@
       <tbody>
         <tr *ngFor="let d of filteredDocs()" [class.selected]="selectedId()===d.id">
           <td class="center">
-            <input type="checkbox" [checked]="selectedId()===d.id" (change)="select(d.id)" />
+            <input type="checkbox" [checked]="selectedId()===d.id" (change)="toggleSelect(d.id)" />
           </td>
           <td>{{ d.title }}</td>
           <td>{{ d.owner }}</td>
@@ -44,9 +44,9 @@
 </div>
 
 <!-- Modal (IT 03-2 / IT 03-3) -->
-<div class="backdrop" *ngIf="modalOpen()" (click)="closeModal()"></div>
+<div class="backdrop" *ngIf="modalMode()" (click)="closeModal()"></div>
 
-<div class="modal" *ngIf="modalOpen()">
+<div class="modal" *ngIf="modalMode()">
   <div class="modal-header">
     <div class="title">
       {{ modalMode()==='APPROVE' ? 'ยืนยันการอนุมัติ' : 'ยืนยันการไม่อนุมัติ' }}
@@ -57,7 +57,12 @@
   <div class="modal-body">
     <div class="row">
       <div class="label">เหตุผล:</div>
-      <textarea [(ngModel)]="reason" rows="5" placeholder="กรอกเหตุผล..."></textarea>
+      <textarea
+        [ngModel]="reason()"
+        (ngModelChange)="reason.set($event)"
+        rows="5"
+        placeholder="กรอกเหตุผล..."
+      ></textarea>
     </div>
   </div>
 
